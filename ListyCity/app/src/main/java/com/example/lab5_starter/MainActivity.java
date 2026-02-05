@@ -1,6 +1,8 @@
 package com.example.lab5_starter;
 
 import android.os.Bundle;
+import android.util.Log;
+import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.ListView;
@@ -11,10 +13,20 @@ import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 
+import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.firebase.firestore.CollectionReference;
+import com.google.firebase.firestore.DocumentReference;
+import com.google.firebase.firestore.FirebaseFirestore;
+import com.google.firebase.firestore.QueryDocumentSnapshot;
+import androidx.appcompat.app.AlertDialog;
+
 import java.util.ArrayList;
 
-public class MainActivity extends AppCompatActivity implements CityDialogFragment.CityDialogListener {
+// ** Delete cities by long clicking on the city to delete, then pressing delete in the confirmation dialogue
 
+public class MainActivity extends AppCompatActivity implements CityDialogFragment.CityDialogListener {
+    private FirebaseFirestore db;
+    private CollectionReference citiesRef;
     private Button addCityButton;
     private ListView cityListView;
 
@@ -41,7 +53,7 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
         cityArrayAdapter = new CityArrayAdapter(this, cityArrayList);
         cityListView.setAdapter(cityArrayAdapter);
 
-        addDummyData();
+
 
         // set listeners
         addCityButton.setOnClickListener(view -> {
@@ -53,6 +65,55 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
             City city = cityArrayAdapter.getItem(i);
             CityDialogFragment cityDialogFragment = CityDialogFragment.newInstance(city);
             cityDialogFragment.show(getSupportFragmentManager(),"City Details");
+        });
+
+
+        // long click listener on cityListView to locate which city to delete
+        cityListView.setOnItemLongClickListener((adapterView, view, i, l) -> {
+            City cityToDelete = cityArrayAdapter.getItem(i);
+            // delete from firebase with confirmation box
+            new AlertDialog.Builder(this)
+                    .setTitle("Delete City")
+                    .setMessage("Delete " + cityToDelete.getName() + "?")
+                    .setPositiveButton("Delete", (dialog, which) -> {
+                        citiesRef.document(cityToDelete.getName())
+                                .delete()
+                                .addOnSuccessListener(unused -> {
+                                    Log.d("Firestore", "City deleted");
+                                })
+                                .addOnFailureListener(e -> {
+                                    Log.e("Firestore", "Error deleting", e);
+                                });
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+
+            return true;
+
+        });
+
+        db = FirebaseFirestore.getInstance();
+        citiesRef = db.collection("cities");
+
+        citiesRef.addSnapshotListener((value, error) -> {
+            if (error != null) {
+                Log.e("Firestore", error.toString());
+            }
+            if (value != null && !value.isEmpty()) {
+                cityListView.setVisibility(View.VISIBLE);
+                cityArrayList.clear();
+                for (QueryDocumentSnapshot snapshot : value) {
+                    String name = snapshot.getString("name");
+                    String province = snapshot.getString("province");
+
+                    cityArrayList.add(new City(name, province));
+                }
+                cityArrayAdapter.notifyDataSetChanged();
+            }
+            else {
+                cityListView.setVisibility(View.GONE);
+            }
+
         });
 
     }
@@ -70,6 +131,15 @@ public class MainActivity extends AppCompatActivity implements CityDialogFragmen
     public void addCity(City city){
         cityArrayList.add(city);
         cityArrayAdapter.notifyDataSetChanged();
+
+        DocumentReference docRef = citiesRef.document(city.getName());
+        docRef.set(city)
+                .addOnSuccessListener(new OnSuccessListener<Void>() {
+                    @Override
+                    public void onSuccess(Void unused) {
+                        Log.d("Firestore", "DocumentSnapshot successfully written");
+                    }
+                });
 
     }
 
