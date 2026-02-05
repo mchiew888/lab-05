@@ -2,8 +2,8 @@
 
 ## Student Details
 
-- **Full Name:** `<Madeline Chiew>`
-- **CCID:** `<mchiew>`
+- **Full Name:** `Madeline Chiew`
+- **CCID:** `mchiew`
 
 ## References and Resources
 
